@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using AngleSharp;
 using AngleSharp.Dom;
@@ -19,6 +20,8 @@ public sealed record NormalizedHtml(string Html, string VisibleText);
 ///  - rewrites links (and self-referential meta URLs such as og:url) that point at the
 ///    page's own host to host-neutral paths (so old-domain vs new-domain links don't read
 ///    as differences),
+///  - strips the page's own origin out of links that *embed* it — e.g. social share buttons
+///    like facebook.com/sharer?u=&lt;own-url&gt; — leaving only the shared path,
 ///  - collapses insignificant whitespace, and
 ///  - sorts attributes for a stable serialization.
 ///
@@ -61,6 +64,11 @@ public static class HtmlNormalizer
     {
         "link", "script", "img", "source", "track", "embed", "audio", "video",
     };
+
+    // Cache, keyed by host, of a regex that strips that origin (scheme://host[:port]) wherever it
+    // appears *inside* a value — including the percent-encoded form share links use. Built lazily
+    // because the host isn't known until a page's base URL is in hand.
+    private static readonly ConcurrentDictionary<string, Regex> EmbeddedOriginPatterns = new();
 
     public static NormalizedHtml Normalize(string rawHtml, Uri baseUrl)
     {
@@ -142,7 +150,8 @@ public static class HtmlNormalizer
         {
             var value = el.GetAttribute(attr);
             if (value is null) continue;
-            el.SetAttribute(attr, NormalizeUrlValue(value, baseUrl, stripQuery: isAsset));
+            value = NormalizeUrlValue(value, baseUrl, stripQuery: isAsset);
+            el.SetAttribute(attr, NeutralizeEmbeddedOrigins(value, baseUrl));
         }
 
         // <meta property="og:url" content="https://own-host/path"> (and og:image, twitter:*, …)
@@ -206,6 +215,30 @@ public static class HtmlNormalizer
             if (q >= 0) v = v[..q];
         }
         return v;
+    }
+
+    /// <summary>
+    /// Strip the page's own origin out of any URL that *embeds* it. Social share buttons carry the
+    /// current page's absolute URL inside a query parameter or text, usually percent-encoded — e.g.
+    /// <c>facebook.com/sharer/sharer.php?u=https%3a%2f%2fown-host%2fpage</c>. That embedded origin
+    /// carries the source domain, so two environments differ there even when the shared page is the
+    /// same; dropping it (and keeping the path) lines them up while still surfacing real path diffs.
+    /// The host appears verbatim even when the surrounding "://" is encoded, so a cheap Contains
+    /// check skips the regex for the vast majority of links.
+    /// </summary>
+    private static string NeutralizeEmbeddedOrigins(string value, Uri baseUrl)
+    {
+        if (value.Length == 0 || !value.Contains(baseUrl.Host, StringComparison.OrdinalIgnoreCase))
+        {
+            return value;
+        }
+
+        var pattern = EmbeddedOriginPatterns.GetOrAdd(baseUrl.Host, host =>
+            new Regex(
+                $@"https?(?:://|%3a%2f%2f){Regex.Escape(host)}(?:(?::|%3a)\d+)?(?=/|%2f|\?|%3f|#|%23|&|%26|[""']|$)",
+                RegexOptions.IgnoreCase | RegexOptions.Compiled));
+
+        return pattern.Replace(value, string.Empty);
     }
 
     private static void SortAttributes(IElement el)

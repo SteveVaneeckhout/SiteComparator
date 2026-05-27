@@ -32,6 +32,9 @@ HTML, while separately listing the pages that exist on only one side.
    - rewrites links — and self-referential meta URLs (`og:url`, `og:image`, `twitter:*`, …) —
      that point at the page's **own host** to host-neutral paths (so old-domain vs new-domain
      URLs aren't reported as differences),
+   - strips the page's own origin out of links that **embed** it, such as social share buttons
+     (`facebook.com/sharer?u=…`, `linkedin.com/shareArticle?url=…`, `whatsapp://send?text=…`),
+     where the current page URL is carried (usually percent-encoded) in a query parameter,
    - collapses insignificant whitespace and sorts attributes.
 4. **Compare** the normalized HTML and produce a similarity score (0–100%), a visible-text
    similarity score, and a side-by-side diff for anything that differs.
