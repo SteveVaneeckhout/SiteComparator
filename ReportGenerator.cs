@@ -327,7 +327,8 @@ public static class ReportGenerator
         .flagdetail { color: #888; font-size: 12px; }
         table.diff { width: 100%; border-collapse: collapse; font: 12px/1.4 ui-monospace, monospace; margin-top: 8px; }
         table.diff td { vertical-align: top; padding: 0 6px; white-space: pre-wrap; word-break: break-all; }
-        table.diff td.ln { text-align: right; color: #888; width: 1%; user-select: none; border-right: 1px solid #8884; }
+        table.diff td.ln { text-align: right; color: #888; word-break: keep-all; user-select: none; border-right: 1px solid #8884; }
+        table.diff td.tx { width: 520px; }
         td.tx.ins, td.ln.ins { background: #1a99331f; }
         td.tx.del, td.ln.del { background: #d2333322; }
         td.tx.mod, td.ln.mod { background: #e8800022; }
