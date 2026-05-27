@@ -16,8 +16,9 @@ public sealed record NormalizedHtml(string Html, string VisibleText);
 ///  - drops scripts, styles, noscript and comments (volatile, not visible content),
 ///  - blanks framework anti-forgery / viewstate / nonce / csrf values,
 ///  - strips cache-busting query strings from asset URLs,
-///  - rewrites links that point at the page's own host to host-neutral paths
-///    (so old-domain vs new-domain links don't read as differences),
+///  - rewrites links (and self-referential meta URLs such as og:url) that point at the
+///    page's own host to host-neutral paths (so old-domain vs new-domain links don't read
+///    as differences),
 ///  - collapses insignificant whitespace, and
 ///  - sorts attributes for a stable serialization.
 ///
@@ -142,6 +143,19 @@ public static class HtmlNormalizer
             var value = el.GetAttribute(attr);
             if (value is null) continue;
             el.SetAttribute(attr, NormalizeUrlValue(value, baseUrl, stripQuery: isAsset));
+        }
+
+        // <meta property="og:url" content="https://own-host/path"> (and og:image, twitter:*, …)
+        // embed an absolute, self-referential URL in `content`. Host-neutralize it like any link
+        // so the source domain isn't read as a difference. NormalizeUrlValue only rewrites
+        // own-host absolute URLs, so non-URL content (descriptions, viewport, …) passes through.
+        if (el.LocalName == "meta")
+        {
+            var content = el.GetAttribute("content");
+            if (content is not null)
+            {
+                el.SetAttribute("content", NormalizeUrlValue(content, baseUrl, stripQuery: false));
+            }
         }
 
         // srcset is a comma-separated list of "url descriptor" candidates.

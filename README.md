@@ -29,8 +29,9 @@ HTML, while separately listing the pages that exist on only one side.
      `__RequestVerificationToken`, CSRF tokens, …),
    - removes `nonce` / `integrity` / CSP-style attributes,
    - strips cache-busting query strings from asset URLs (`style.css?v=123`),
-   - rewrites links that point at the page's **own host** to host-neutral paths (so old-domain
-     vs new-domain links aren't reported as differences),
+   - rewrites links — and self-referential meta URLs (`og:url`, `og:image`, `twitter:*`, …) —
+     that point at the page's **own host** to host-neutral paths (so old-domain vs new-domain
+     URLs aren't reported as differences),
    - collapses insignificant whitespace and sorts attributes.
 4. **Compare** the normalized HTML and produce a similarity score (0–100%), a visible-text
    similarity score, and a side-by-side diff for anything that differs.
