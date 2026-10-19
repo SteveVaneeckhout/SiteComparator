@@ -243,14 +243,16 @@ public static class HtmlNormalizer
 
     private static void SortAttributes(IElement el)
     {
-        var attrs = el.Attributes.Select(a => (a.Name, a.Value)).ToList();
+        var attrs = el.Attributes.ToList();
         if (attrs.Count < 2) return;
 
         var sorted = attrs.OrderBy(a => a.Name, StringComparer.Ordinal).ToList();
         if (attrs.SequenceEqual(sorted)) return;
 
-        foreach (var (name, _) in attrs) el.RemoveAttribute(name);
-        foreach (var (name, value) in sorted) el.SetAttribute(name, value);
+        // Move the existing attribute nodes rather than calling SetAttribute: the parser accepts
+        // names SetAttribute rejects as invalid (e.g. Alpine/Vue "@click"), which would throw.
+        foreach (var attr in attrs) el.Attributes.RemoveNamedItem(attr.Name);
+        foreach (var attr in sorted) el.Attributes.SetNamedItem(attr);
     }
 
     private static void CollapseWhitespace(IDocument doc)
